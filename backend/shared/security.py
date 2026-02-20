@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -39,3 +41,12 @@ def replay_guard(request: Request) -> None:
     timestamp = request.headers.get("X-Timestamp")
     if not nonce or not timestamp:
         raise HTTPException(status_code=400, detail="Missing anti-replay headers")
+
+
+def verify_hmac_signature(request: Request, body: bytes) -> None:
+    signature = request.headers.get("X-Signature")
+    if not signature:
+        raise HTTPException(status_code=401, detail="Missing signature")
+    expected = hmac.new(settings.hmac_shared_secret.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=401, detail="Invalid signature")

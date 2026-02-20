@@ -79,7 +79,7 @@ services:
         condition: service_healthy
     restart: "no"
 
-  auth_service:
+  auth-service:
     <<: *backend-common
     command: uvicorn backend.services.auth_service.app.main:app --host 0.0.0.0 --port 8001
     ports:
@@ -90,7 +90,7 @@ services:
       timeout: 5s
       retries: 20
 
-  device_service:
+  device-service:
     <<: *backend-common
     command: uvicorn backend.services.device_service.app.main:app --host 0.0.0.0 --port 8002
     ports:
@@ -101,7 +101,7 @@ services:
       timeout: 5s
       retries: 20
 
-  task_service:
+  task-service:
     <<: *backend-common
     command: uvicorn backend.services.task_service.app.main:app --host 0.0.0.0 --port 8003
     ports:
@@ -112,7 +112,7 @@ services:
       timeout: 5s
       retries: 20
 
-  patch_service:
+  patch-service:
     <<: *backend-common
     command: uvicorn backend.services.patch_service.app.main:app --host 0.0.0.0 --port 8004
     ports:
@@ -123,7 +123,7 @@ services:
       timeout: 5s
       retries: 20
 
-  reporting_service:
+  reporting-service:
     <<: *backend-common
     command: uvicorn backend.services.reporting_service.app.main:app --host 0.0.0.0 --port 8005
     ports:
@@ -134,7 +134,7 @@ services:
       timeout: 5s
       retries: 20
 
-  notification_service:
+  notification-service:
     <<: *backend-common
     command: uvicorn backend.services.notification_service.app.main:app --host 0.0.0.0 --port 8006
     ports:
@@ -171,23 +171,38 @@ services:
     depends_on:
       frontend:
         condition: service_healthy
-      auth_service:
+      auth-service:
         condition: service_healthy
-      device_service:
+      device-service:
         condition: service_healthy
-      task_service:
+      task-service:
         condition: service_healthy
-      patch_service:
+      patch-service:
         condition: service_healthy
-      reporting_service:
+      reporting-service:
         condition: service_healthy
-      notification_service:
+      notification-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080 >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ..
+      dockerfile: agent/Dockerfile
+    env_file:
+      - ../.env
+    environment:
+      UEM_AUTH_URL: http://api-gateway:8080/auth/v1/auth/login
+      UEM_DEVICE_URL: http://api-gateway:8080/devices/v1/devices
+      UEM_HMAC_SECRET: ${HMAC_SHARED_SECRET}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
