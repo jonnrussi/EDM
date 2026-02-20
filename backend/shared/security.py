@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -18,14 +20,14 @@ def issue_jwt(subject: str, tenant_id: str, role: str) -> str:
         "iat": now,
         "exp": now + timedelta(hours=1),
     }
-    return jwt.encode(payload, "dev-secret", algorithm="HS256")
+    return jwt.encode(payload, settings.jwt_shared_secret, algorithm="HS256")
 
 
 def verify_jwt(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(
             token,
-            "dev-secret",
+            settings.jwt_shared_secret,
             audience=settings.jwt_audience,
             issuer=settings.jwt_issuer,
             algorithms=["HS256"],
@@ -39,3 +41,12 @@ def replay_guard(request: Request) -> None:
     timestamp = request.headers.get("X-Timestamp")
     if not nonce or not timestamp:
         raise HTTPException(status_code=400, detail="Missing anti-replay headers")
+
+
+def verify_hmac_signature(request: Request, body: bytes) -> None:
+    signature = request.headers.get("X-Signature")
+    if not signature:
+        raise HTTPException(status_code=401, detail="Missing signature")
+    expected = hmac.new(settings.hmac_shared_secret.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=401, detail="Invalid signature")

@@ -33,3 +33,8 @@ def create_task(body: TaskRequest, db: Session = Depends(get_db), user=Depends(r
     db.commit()
     publish_event("task.created", {"task_id": task.id, "tenant_id": task.tenant_id})
     return {"task_id": task.id, "status": task.status}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

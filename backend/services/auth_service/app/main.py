@@ -31,3 +31,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         db.commit()
     token = issue_jwt(subject=user.id, tenant_id=user.tenant_id, role=user.role)
     return {"access_token": token, "token_type": "bearer"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
