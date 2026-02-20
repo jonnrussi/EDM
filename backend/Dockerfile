@@ -4,4 +4,4 @@ COPY backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY backend /app/backend
 ENV PYTHONPATH=/app
-CMD ["uvicorn", "backend.services.auth-service.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.services.auth_service.app.main:app", "--host", "0.0.0.0", "--port", "8001"]

@@ -4,11 +4,18 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.shared.bootstrap import startup_banner
 from backend.shared.db import get_db
 from backend.shared.models import Device
 from backend.shared.rbac import require_permission
+from backend.shared.security import verify_hmac_request
 
 app = FastAPI(title="UEM Device Service")
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    startup_banner("device-service")
 
 
 class DeviceRegistration(BaseModel):
@@ -19,7 +26,15 @@ class DeviceRegistration(BaseModel):
     ram_mb: int
 
 
-@app.post("/v1/devices", dependencies=[Depends(require_permission("device:write"))])
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": "device-service"}
+
+
+@app.post(
+    "/v1/devices",
+    dependencies=[Depends(require_permission("device:write")), Depends(verify_hmac_request)],
+)
 def register_device(payload: DeviceRegistration, db: Session = Depends(get_db)):
     device = Device(
         id=str(uuid4()),
