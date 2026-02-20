@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.shared.bootstrap import startup_banner
 from backend.shared.db import get_db
 from backend.shared.events import publish_event
 from backend.shared.models import Task
@@ -12,10 +13,20 @@ from backend.shared.rbac import require_permission
 app = FastAPI(title="UEM Task Service")
 
 
+@app.on_event("startup")
+def on_startup() -> None:
+    startup_banner("task-service")
+
+
 class TaskRequest(BaseModel):
     device_id: str
     task_type: str
     payload: dict
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": "task-service"}
 
 
 @app.post("/v1/tasks", dependencies=[Depends(require_permission("task:run"))])

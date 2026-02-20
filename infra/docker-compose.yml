@@ -1,52 +1,142 @@
 version: '3.9'
+
+x-backend-common: &backend-common
+  build:
+    context: ..
+    dockerfile: backend/Dockerfile
+  env_file:
+    - ../.env
+  restart: unless-stopped
+
 services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: uem
-      POSTGRES_USER: uem_user
-      POSTGRES_PASSWORD: change-me
-    ports: ["5432:5432"]
-    volumes: ["pgdata:/var/lib/postgresql/data"]
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
     image: redis:7
-    ports: ["6379:6379"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   rabbitmq:
     image: rabbitmq:3-management
     environment:
-      RABBITMQ_DEFAULT_USER: uem
-      RABBITMQ_DEFAULT_PASS: uem
-    ports: ["5672:5672", "15672:15672"]
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  migrate:
+    <<: *backend-common
+    command: python -m backend.scripts.migrate_db
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   auth-service:
-    build: { context: .., dockerfile: backend/Dockerfile }
+    <<: *backend-common
     command: uvicorn backend.services.auth_service.app.main:app --host 0.0.0.0 --port 8001
-    env_file: [../.env.example]
-    ports: ["8001:8001"]
-    depends_on: [postgres, redis, rabbitmq]
+    ports:
+      - "8001:8001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   device-service:
-    build: { context: .., dockerfile: backend/Dockerfile }
+    <<: *backend-common
     command: uvicorn backend.services.device_service.app.main:app --host 0.0.0.0 --port 8002
-    env_file: [../.env.example]
-    ports: ["8002:8002"]
-    depends_on: [postgres, redis, rabbitmq]
+    ports:
+      - "8002:8002"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   task-service:
-    build: { context: .., dockerfile: backend/Dockerfile }
+    <<: *backend-common
     command: uvicorn backend.services.task_service.app.main:app --host 0.0.0.0 --port 8003
-    env_file: [../.env.example]
-    ports: ["8003:8003"]
-    depends_on: [postgres, redis, rabbitmq]
+    ports:
+      - "8003:8003"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   api-gateway:
     image: nginx:1.27-alpine
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports: ["8080:8080"]
-    depends_on: [auth-service, device-service, task-service]
+    ports:
+      - "8080:8080"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      device-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+
+  agent:
+    build:
+      context: ..
+      dockerfile: agent/Dockerfile
+    env_file:
+      - ../.env
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      device-service:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata:

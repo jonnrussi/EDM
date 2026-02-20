@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
+from backend.shared.bootstrap import startup_banner
 from backend.shared.db import get_db
 from backend.shared.models import User
 from backend.shared.security import issue_jwt
@@ -11,9 +12,19 @@ from backend.shared.security import issue_jwt
 app = FastAPI(title="UEM Auth Service")
 
 
+@app.on_event("startup")
+def on_startup() -> None:
+    startup_banner("auth-service")
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": "auth-service"}
 
 
 @app.post("/v1/auth/login")
