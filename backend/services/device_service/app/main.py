@@ -41,3 +41,8 @@ def register_device(payload: DeviceRegistration, db: Session = Depends(get_db)):
 def list_devices(db: Session = Depends(get_db)):
     rows = db.query(Device).limit(100).all()
     return [{"id": x.id, "hostname": x.hostname, "os": x.os_name} for x in rows]
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

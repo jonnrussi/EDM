@@ -18,14 +18,14 @@ def issue_jwt(subject: str, tenant_id: str, role: str) -> str:
         "iat": now,
         "exp": now + timedelta(hours=1),
     }
-    return jwt.encode(payload, "dev-secret", algorithm="HS256")
+    return jwt.encode(payload, settings.jwt_shared_secret, algorithm="HS256")
 
 
 def verify_jwt(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(
             token,
-            "dev-secret",
+            settings.jwt_shared_secret,
             audience=settings.jwt_audience,
             issuer=settings.jwt_issuer,
             algorithms=["HS256"],
